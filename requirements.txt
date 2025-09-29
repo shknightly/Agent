@@ -3,5 +3,4 @@ groq
 python-dotenv
 google-generativeai
 aiohttp
-requests
 asyncpg

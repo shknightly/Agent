@@ -22,12 +22,12 @@ async def setup_webhook():
     if not BOT_TOKEN or not VERCEL_URL:
         logger.critical(
             "FATAL: Missing required environment variables: BOT_TOKEN, VERCEL_URL. "
-            "Please create a .env file or set them in your environment."
+            "Please create a .env file with these values or set them in your environment."
         )
         sys.exit(1)
 
-    # The '/api' path is where the Vercel function will be listening.
-    WEBHOOK_PATH = "/api"
+    # This must match the entry point file in the /api directory
+    WEBHOOK_PATH = "/api/index.py"
     WEBHOOK_URL = f"https://{VERCEL_URL}{WEBHOOK_PATH}"
 
     bot = Bot(token=BOT_TOKEN)
@@ -37,25 +37,23 @@ async def setup_webhook():
         await bot.set_webhook(url=WEBHOOK_URL)
         webhook_info = await bot.get_webhook_info()
 
-        logger.info("Webhook information:")
-        logger.info(f"  URL: {webhook_info.url}")
-        logger.info(f"  Has custom certificate: {webhook_info.has_custom_certificate}")
-        logger.info(f"  Pending update count: {webhook_info.pending_update_count}")
+        logger.info("--- Webhook Information ---")
+        logger.info(f"URL: {webhook_info.url}")
+        logger.info(f"Has custom certificate: {webhook_info.has_custom_certificate}")
+        logger.info(f"Pending update count: {webhook_info.pending_update_count}")
         if webhook_info.last_error_date:
-            logger.error(f"  Last error date: {webhook_info.last_error_date}")
-            logger.error(f"  Last error message: {webhook_info.last_error_message}")
-
+            logger.error(f"Last error date: {webhook_info.last_error_date}")
+            logger.error(f"Last error message: {webhook_info.last_error_message}")
+        logger.info("--------------------------")
         logger.info("✅ Webhook set successfully!")
 
     except Exception as e:
         logger.error(f"❌ Failed to set webhook: {e}")
     finally:
-        # It's important to close the session when the bot instance is no longer needed.
         if bot.session and not bot.session.closed:
             await bot.session.close()
 
 if __name__ == "__main__":
-    # Ensure dependencies are installed before running
     try:
         import aiogram
         import python_dotenv
