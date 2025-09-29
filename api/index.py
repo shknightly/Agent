@@ -449,6 +449,8 @@ async def answer_markdown(message: Message, text: str, **kwargs) -> Optional[Mes
 BOT_COMMANDS: List[BotCommand] = [
     BotCommand(command="start", description="Show help"),
     BotCommand(command="build", description="Generate code with AI"),
+    BotCommand(command="ai", description="Ask the coding assistant"),
+    BotCommand(command="analyze", description="Review a code snippet"),
     BotCommand(command="python", description="Run Python code"),
     BotCommand(command="node", description="Run Node.js code"),
     BotCommand(command="bash", description="Run Bash commands"),
@@ -458,6 +460,8 @@ BOT_COMMANDS: List[BotCommand] = [
 
 GROUP_COMMANDS: List[BotCommand] = [
     BotCommand(command="start", description="Show help"),
+    BotCommand(command="ai", description="Ask the coding assistant"),
+    BotCommand(command="analyze", description="Review a code snippet"),
     BotCommand(command="python", description="Run Python code"),
     BotCommand(command="node", description="Run Node.js code"),
     BotCommand(command="bash", description="Run Bash commands"),
@@ -514,6 +518,56 @@ async def cmd_build(message: Message):
         await thinking_msg.edit_text("✅ Build ready", parse_mode=ParseMode.MARKDOWN_V2)
     except TelegramBadRequest:
         await thinking_msg.delete()
+
+
+@router.message(Command("ai"))
+async def cmd_ai(message: Message):
+    if not await ensure_authorized(message):
+        return
+
+    _, _, question = message.text.partition(" ")
+    question = question.strip()
+    if not question:
+        await answer_markdown(
+            message,
+            "Usage: `/ai <question>`",
+        )
+        return
+
+    thinking_msg = await send_status_message(message, "🤖 Thinking...")
+    response = await llm_manager.generate(question)
+    await answer_markdown(message, response)
+    try:
+        await thinking_msg.edit_text("✅ Response ready", parse_mode=ParseMode.MARKDOWN_V2)
+    except TelegramBadRequest:
+        await thinking_msg.delete()
+
+
+@router.message(Command("analyze"))
+async def cmd_analyze(message: Message):
+    if not await ensure_authorized(message):
+        return
+
+    code = message.text.replace("/analyze", "", 1).strip()
+    if not code:
+        await answer_markdown(
+            message,
+            "Usage: `/analyze <code>`",
+        )
+        return
+
+    thinking_msg = await send_status_message(message, "🔍 Analyzing code...")
+    prompt = (
+        "Analyze the following code snippet. Explain what it does, point out potential bugs or risks, and suggest improvements.\n\n"
+        f"```\n{code}\n```"
+    )
+    analysis = await llm_manager.generate(prompt)
+    await answer_markdown(message, analysis)
+    try:
+        await thinking_msg.edit_text("✅ Analysis ready", parse_mode=ParseMode.MARKDOWN_V2)
+    except TelegramBadRequest:
+        await thinking_msg.delete()
+
 
 @router.message(Command("python", "p", "node", "n", "bash", "b"))
 async def cmd_execute(message: Message):
