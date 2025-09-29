@@ -4,12 +4,27 @@
     {
       "src": "api/index.py",
       "use": "@vercel/python"
+    },
+    {
+      "src": "public/**/*",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/api/index(?:\.py)?",
       "dest": "api/index.py"
+    },
+    {
+      "src": "/api/health",
+      "dest": "api/index.py"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "public/index.html"
     }
   ]
 }

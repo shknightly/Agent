@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Telegram Mini App Developer Console</title>
+  <script src="https://telegram.org/js/telegram-web-app.js?59"></script>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --tg-bg-color: #0f172a;
+      --tg-secondary-bg-color: rgba(148, 163, 184, 0.08);
+      --tg-text-color: #f8fafc;
+      --tg-subtle-text-color: rgba(248, 250, 252, 0.75);
+      --tg-border-color: rgba(148, 163, 184, 0.35);
+      --tg-accent-color: #38bdf8;
+      --tg-success-color: #22c55e;
+      --tg-warning-color: #facc15;
+      --tg-error-color: #f87171;
+      --tg-button-text-color: #0f172a;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(56, 189, 248, 0.22), transparent 60%),
+        radial-gradient(circle at bottom, rgba(34, 197, 94, 0.2), transparent 65%),
+        var(--tg-bg-color);
+      color: var(--tg-text-color);
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      padding: clamp(1.25rem, 4vw, 3rem);
+      transition: background 0.35s ease, color 0.35s ease;
+    }
+
+    main {
+      width: min(1080px, 100%);
+      display: flex;
+      flex-direction: column;
+      gap: clamp(1.25rem, 3vw, 2.1rem);
+    }
+
+    .hero {
+      padding: clamp(1.6rem, 3vw, 2.4rem);
+      border-radius: 1.5rem;
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.8), rgba(30, 41, 59, 0.95));
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      box-shadow: 0 35px 60px -25px rgba(15, 23, 42, 0.8);
+    }
+
+    .hero h1 {
+      margin: 0 0 0.75rem;
+      font-size: clamp(2.15rem, 5vw, 3.1rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+
+    .hero p {
+      margin: 0;
+      font-size: clamp(1rem, 2.5vw, 1.15rem);
+      line-height: 1.65;
+      color: var(--tg-subtle-text-color);
+    }
+
+    .hero p + p {
+      margin-top: 0.75rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      background: rgba(148, 163, 184, 0.18);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      color: var(--tg-text-color);
+      margin-bottom: 1rem;
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .badge[data-state="ready"] {
+      background: rgba(34, 197, 94, 0.2);
+      border-color: rgba(34, 197, 94, 0.35);
+    }
+
+    .badge[data-state="error"] {
+      background: rgba(248, 113, 113, 0.2);
+      border-color: rgba(248, 113, 113, 0.4);
+    }
+
+    .notice {
+      margin-top: 1.1rem;
+      padding: 0.9rem 1.2rem;
+      border-radius: 0.95rem;
+      background: rgba(248, 250, 252, 0.12);
+      color: var(--tg-text-color);
+      border: 1px dashed rgba(148, 163, 184, 0.3);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .card {
+      background: linear-gradient(165deg, rgba(15, 23, 42, 0.84), rgba(30, 41, 59, 0.94));
+      border-radius: 1.25rem;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      padding: clamp(1.25rem, 3vw, 1.95rem);
+      box-shadow: 0 25px 40px -25px rgba(15, 23, 42, 0.65);
+    }
+
+    .card h2 {
+      margin: 0 0 1rem;
+      font-size: clamp(1.25rem, 3vw, 1.65rem);
+      font-weight: 600;
+    }
+
+    .definition-list {
+      display: grid;
+      gap: 0.85rem 1.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      margin: 0;
+    }
+
+    .definition-list dt {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(248, 250, 252, 0.5);
+      margin-bottom: 0.3rem;
+    }
+
+    .definition-list dd {
+      margin: 0;
+      font-size: 1rem;
+      word-break: break-word;
+      color: var(--tg-text-color);
+    }
+
+    pre {
+      margin: 0;
+      padding: 1rem;
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 1rem;
+      border: 1px solid rgba(148, 163, 184, 0.15);
+      font-size: 0.85rem;
+      line-height: 1.5;
+      max-height: 240px;
+      overflow: auto;
+    }
+
+    code.inline {
+      padding: 0.1rem 0.35rem;
+      border-radius: 0.45rem;
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      font-size: 0.85rem;
+    }
+
+    .actions-grid {
+      display: grid;
+      gap: 0.85rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+
+    button {
+      appearance: none;
+      border: none;
+      border-radius: 0.95rem;
+      padding: 0.85rem 1.1rem;
+      font-size: 0.97rem;
+      font-weight: 600;
+      background: linear-gradient(135deg, rgba(96, 165, 250, 0.16), rgba(59, 130, 246, 0.28));
+      color: var(--tg-text-color);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease, opacity 0.2s ease;
+      box-shadow: 0 15px 30px -18px rgba(59, 130, 246, 0.65);
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 22px 35px -20px rgba(96, 165, 250, 0.8);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+      box-shadow: none;
+    }
+
+    button[data-variant="success"] {
+      background: linear-gradient(135deg, rgba(74, 222, 128, 0.16), rgba(34, 197, 94, 0.32));
+      box-shadow: 0 18px 32px -20px rgba(74, 222, 128, 0.75);
+    }
+
+    button[data-variant="danger"] {
+      background: linear-gradient(135deg, rgba(248, 113, 113, 0.22), rgba(239, 68, 68, 0.28));
+      box-shadow: 0 18px 32px -20px rgba(248, 113, 113, 0.75);
+    }
+
+    .capabilities-grid {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 0.75rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .capability {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      padding: 0.85rem 1rem;
+      border-radius: 0.95rem;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .capability[data-state="available"] {
+      border-color: rgba(34, 197, 94, 0.45);
+      background: rgba(20, 83, 45, 0.35);
+    }
+
+    .capability[data-state="missing"] {
+      border-color: rgba(248, 113, 113, 0.4);
+      background: rgba(127, 29, 29, 0.25);
+    }
+
+    .capability__label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(248, 250, 252, 0.55);
+    }
+
+    .capability__value {
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .event-log {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .event-log__entry {
+      display: grid;
+      gap: 0.35rem 0.75rem;
+      grid-template-columns: auto 1fr;
+      align-items: baseline;
+      padding: 0.85rem 1rem;
+      border-radius: 0.9rem;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      font-size: 0.92rem;
+    }
+
+    .event-log__label {
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.68rem;
+      letter-spacing: 0.1em;
+      color: rgba(248, 250, 252, 0.55);
+    }
+
+    .event-log__text {
+      color: var(--tg-text-color);
+      word-break: break-word;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 1rem;
+      }
+
+      .hero,
+      .card {
+        border-radius: 1.05rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <div class="badge" data-role="status" data-state="pending">Connecting to Telegram Web App...</div>
+      <h1>Telegram Mini App Developer Console</h1>
+      <p>
+        Inspect the live connection with <code class="inline">window.Telegram.WebApp</code>, preview user data, and exercise the latest
+        platform APIs introduced up to Bot API 9.2 &amp; WebApp 2025 releases.
+      </p>
+      <p>
+        This console is designed to work alongside <strong>Vercel Sandbox</strong>, Telegram's recommended way to run untrusted or
+        AI-generated code safely. Pair it with sandbox instances to validate Mini App UI, backend calls, and real-time preview links
+        before going live.
+      </p>
+      <p class="notice hidden" data-role="no-telegram">
+        To unlock Telegram-only capabilities, open this page inside the Telegram client. Outside of Telegram the SDK is unavailable,
+        so actions are disabled for your safety.
+      </p>
+    </header>
+
+    <section class="card">
+      <h2>Session overview</h2>
+      <dl class="definition-list">
+        <div>
+          <dt>User</dt>
+          <dd id="user-name">—</dd>
+        </div>
+        <div>
+          <dt>User ID</dt>
+          <dd id="user-id">—</dd>
+        </div>
+        <div>
+          <dt>Username</dt>
+          <dd id="username">—</dd>
+        </div>
+        <div>
+          <dt>Language</dt>
+          <dd id="language">—</dd>
+        </div>
+        <div>
+          <dt>Theme</dt>
+          <dd id="theme">—</dd>
+        </div>
+        <div>
+          <dt>Is Expanded</dt>
+          <dd id="expanded">—</dd>
+        </div>
+        <div>
+          <dt>Is Active</dt>
+          <dd id="active-state">—</dd>
+        </div>
+        <div>
+          <dt>Is Fullscreen</dt>
+          <dd id="fullscreen">—</dd>
+        </div>
+        <div>
+          <dt>Vertical Swipes</dt>
+          <dd id="vertical-swipes">—</dd>
+        </div>
+        <div>
+          <dt>Orientation Locked</dt>
+          <dd id="orientation-locked">—</dd>
+        </div>
+        <div>
+          <dt>Platform</dt>
+          <dd id="platform">—</dd>
+        </div>
+        <div>
+          <dt>SDK Version</dt>
+          <dd id="sdk-version">—</dd>
+        </div>
+      </dl>
+      <div style="margin-top: 1.25rem; display: grid; gap: 0.75rem;">
+        <label style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(248, 250, 252, 0.5);">
+          Safe area insets
+        </label>
+        <pre id="safe-area">—</pre>
+        <label style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(248, 250, 252, 0.5);">
+          Content safe area
+        </label>
+        <pre id="content-safe-area">—</pre>
+        <label style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(248, 250, 252, 0.5);">
+          initData
+        </label>
+        <pre id="init-data">—</pre>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Platform capabilities</h2>
+      <ul class="capabilities-grid">
+        <li class="capability" data-capability="device-storage" data-state="unknown">
+          <span class="capability__label">DeviceStorage</span>
+          <span class="capability__value">Detecting…</span>
+        </li>
+        <li class="capability" data-capability="secure-storage" data-state="unknown">
+          <span class="capability__label">SecureStorage</span>
+          <span class="capability__value">Detecting…</span>
+        </li>
+        <li class="capability" data-capability="location-manager" data-state="unknown">
+          <span class="capability__label">LocationManager</span>
+          <span class="capability__value">Detecting…</span>
+        </li>
+        <li class="capability" data-capability="accelerometer" data-state="unknown">
+          <span class="capability__label">Accelerometer</span>
+          <span class="capability__value">Detecting…</span>
+        </li>
+        <li class="capability" data-capability="device-orientation" data-state="unknown">
+          <span class="capability__label">DeviceOrientation</span>
+          <span class="capability__value">Detecting…</span>
+        </li>
+        <li class="capability" data-capability="gyroscope" data-state="unknown">
+          <span class="capability__label">Gyroscope</span>
+          <span class="capability__value">Detecting…</span>
+        </li>
+        <li class="capability" data-capability="bottom-button" data-state="unknown">
+          <span class="capability__label">BottomButton</span>
+          <span class="capability__value">Detecting…</span>
+        </li>
+        <li class="capability" data-capability="secondary-button" data-state="unknown">
+          <span class="capability__label">SecondaryButton</span>
+          <span class="capability__value">Detecting…</span>
+        </li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Interactive controls</h2>
+      <div class="actions-grid">
+        <button type="button" data-action="expand">Expand Web App</button>
+        <button type="button" data-action="toggle-main-button">Toggle Main Button</button>
+        <button type="button" data-action="send-data" data-variant="success">Send sample data</button>
+        <button type="button" data-action="haptic-impact">Haptic: medium impact</button>
+        <button type="button" data-action="haptic-notify">Haptic: success notification</button>
+        <button type="button" data-action="toggle-closing">Toggle close confirmation</button>
+        <button type="button" data-action="show-alert">Show alert</button>
+        <button type="button" data-action="show-confirm" data-variant="danger">Show confirm &amp; close</button>
+        <button type="button" data-action="open-docs">Open Web App docs</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Advanced API experiments</h2>
+      <div class="actions-grid">
+        <button type="button" data-action="request-fullscreen">Request fullscreen</button>
+        <button type="button" data-action="exit-fullscreen">Exit fullscreen</button>
+        <button type="button" data-action="hide-keyboard">Hide keyboard</button>
+        <button type="button" data-action="check-home-screen">Check home-screen status</button>
+        <button type="button" data-action="add-to-home-screen">Add to home screen</button>
+        <button type="button" data-action="lock-orientation">Lock orientation</button>
+        <button type="button" data-action="unlock-orientation">Unlock orientation</button>
+      </div>
+      <p style="margin-top: 1rem; font-size: 0.9rem; color: var(--tg-subtle-text-color);">
+        These handlers demonstrate Bot API 8.0+ features including fullscreen controls, homescreen shortcuts, orientation management,
+        and the Bot API 9.0 <code class="inline">hideKeyboard()</code> helper. When unavailable, graceful fallbacks keep your console safe.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Vercel Sandbox playbook</h2>
+      <p style="margin-bottom: 0.9rem; color: var(--tg-subtle-text-color);">
+        Launching AI-crafted interfaces inside Telegram pairs perfectly with Vercel Sandbox. Use it to:
+      </p>
+      <ul style="margin: 0; padding-left: 1.1rem; display: grid; gap: 0.55rem; color: var(--tg-subtle-text-color);">
+        <li>Execute untrusted or AI-generated Mini App code without risking production infrastructure.</li>
+        <li>Build dynamic sandboxes that stream live previews back into this console via <code class="inline">webApp.sendData()</code>.</li>
+        <li>Test backend logic in isolation with access to logs, file diffs, and secure callbacks.</li>
+      </ul>
+      <p style="margin-top: 0.9rem; font-size: 0.9rem; color: var(--tg-subtle-text-color);">
+        Keep your sandbox tokens in bot secrets and rotate them regularly. Pair telemetry from Sandbox runs with the event feed below to
+        triage issues faster.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Event feed</h2>
+      <div class="event-log" id="event-log" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <script>
+    window.addEventListener("DOMContentLoaded", () => {
+      const statusBadge = document.querySelector('[data-role="status"]');
+      const fallbackNotice = document.querySelector('[data-role="no-telegram"]');
+      const initDataElement = document.getElementById("init-data");
+      const userNameElement = document.getElementById("user-name");
+      const userIdElement = document.getElementById("user-id");
+      const usernameElement = document.getElementById("username");
+      const languageElement = document.getElementById("language");
+      const themeElement = document.getElementById("theme");
+      const expandedElement = document.getElementById("expanded");
+      const activeElement = document.getElementById("active-state");
+      const fullscreenElement = document.getElementById("fullscreen");
+      const verticalSwipesElement = document.getElementById("vertical-swipes");
+      const orientationLockedElement = document.getElementById("orientation-locked");
+      const platformElement = document.getElementById("platform");
+      const sdkVersionElement = document.getElementById("sdk-version");
+      const safeAreaElement = document.getElementById("safe-area");
+      const contentSafeAreaElement = document.getElementById("content-safe-area");
+      const eventLog = document.getElementById("event-log");
+      const actionButtons = Array.from(document.querySelectorAll("[data-action]"));
+      const capabilityNodes = Array.from(document.querySelectorAll(".capability"));
+
+      let webApp = window.Telegram && window.Telegram.WebApp;
+      let mainButtonVisible = false;
+      let closingConfirmationEnabled = false;
+
+      const setStatus = (text, state = "pending") => {
+        statusBadge.textContent = text;
+        statusBadge.dataset.state = state;
+      };
+
+      const logEvent = (label, message) => {
+        const entry = document.createElement("div");
+        entry.className = "event-log__entry";
+        const labelElement = document.createElement("span");
+        labelElement.className = "event-log__label";
+        labelElement.textContent = label;
+        const messageElement = document.createElement("span");
+        messageElement.className = "event-log__text";
+        messageElement.textContent = message;
+        entry.append(labelElement, messageElement);
+        eventLog.prepend(entry);
+        const entries = eventLog.querySelectorAll(".event-log__entry");
+        if (entries.length > 48) {
+          entries[entries.length - 1].remove();
+        }
+      };
+
+      const withFallback = (value, fallback) => (value === undefined || value === null || value === "" ? fallback : value);
+
+      const applyTheme = () => {
+        if (!webApp) return;
+        const root = document.documentElement;
+        const params = webApp.themeParams || {};
+        const scheme = webApp.colorScheme || "dark";
+
+        root.style.setProperty("--tg-bg-color", withFallback(params.bg_color, scheme === "dark" ? "#0f172a" : "#ffffff"));
+        root.style.setProperty("--tg-secondary-bg-color", withFallback(params.secondary_bg_color, scheme === "dark" ? "rgba(148,163,184,0.1)" : "#f1f5f9"));
+        root.style.setProperty("--tg-text-color", withFallback(params.text_color, scheme === "dark" ? "#f8fafc" : "#1f2937"));
+        root.style.setProperty("--tg-subtle-text-color", withFallback(params.hint_color, scheme === "dark" ? "rgba(226,232,240,0.75)" : "#475569"));
+        root.style.setProperty("--tg-border-color", withFallback(params.secondary_bg_color, "rgba(148, 163, 184, 0.35)"));
+        root.style.setProperty("--tg-accent-color", withFallback(params.link_color, "#38bdf8"));
+        root.style.setProperty("--tg-success-color", withFallback(params.button_color, "#22c55e"));
+        root.style.setProperty("--tg-button-text-color", withFallback(params.button_text_color, scheme === "dark" ? "#0f172a" : "#ffffff"));
+        document.body.dataset.theme = scheme;
+      };
+
+      const stringifyMaybe = (value) => {
+        try {
+          if (!value) return "—";
+          return JSON.stringify(value, null, 2);
+        } catch (error) {
+          return String(value);
+        }
+      };
+
+      const populateSessionDetails = () => {
+        if (!webApp) return;
+        const unsafe = webApp.initDataUnsafe || {};
+        const user = unsafe.user || {};
+        const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ") || user.username || "—";
+        userNameElement.textContent = fullName;
+        userIdElement.textContent = user.id ? String(user.id) : "—";
+        usernameElement.textContent = user.username ? `@${user.username}` : "—";
+        languageElement.textContent = user.language_code || unsafe.language || "—";
+        themeElement.textContent = `${webApp.colorScheme || "unknown"}`;
+        platformElement.textContent = webApp.platform || "—";
+        sdkVersionElement.textContent = webApp.version || "—";
+        initDataElement.textContent = webApp.initData || "—";
+      };
+
+      const updateViewportFlags = () => {
+        if (!webApp) return;
+        expandedElement.textContent = webApp.isExpanded ? "Yes" : "No";
+        activeElement.textContent = withFallback(webApp.isActive, false) ? "Yes" : "No";
+        fullscreenElement.textContent = withFallback(webApp.isFullscreen, false) ? "Yes" : "No";
+        verticalSwipesElement.textContent = withFallback(webApp.isVerticalSwipesEnabled, true) ? "Enabled" : "Disabled";
+        orientationLockedElement.textContent = withFallback(webApp.isOrientationLocked, false) ? "Yes" : "No";
+      };
+
+      const updateSafeAreas = () => {
+        if (!webApp) return;
+        safeAreaElement.textContent = stringifyMaybe(webApp.safeAreaInset);
+        contentSafeAreaElement.textContent = stringifyMaybe(webApp.contentSafeAreaInset);
+      };
+
+      const capabilityMap = {
+        "device-storage": () => Boolean(webApp?.DeviceStorage),
+        "secure-storage": () => Boolean(webApp?.SecureStorage),
+        "location-manager": () => Boolean(webApp?.LocationManager),
+        "accelerometer": () => Boolean(webApp?.Accelerometer),
+        "device-orientation": () => Boolean(webApp?.DeviceOrientation),
+        "gyroscope": () => Boolean(webApp?.Gyroscope),
+        "bottom-button": () => Boolean(webApp?.BottomButton),
+        "secondary-button": () => Boolean(webApp?.SecondaryButton),
+      };
+
+      const refreshCapabilities = () => {
+        capabilityNodes.forEach((node) => {
+          const key = node.dataset.capability;
+          const resolver = capabilityMap[key];
+          if (!resolver) return;
+          const available = Boolean(resolver());
+          node.dataset.state = available ? "available" : "missing";
+          node.querySelector(".capability__value").textContent = available ? "Available" : "Unavailable";
+        });
+      };
+
+      const disableActions = () => {
+        actionButtons.forEach((btn) => {
+          btn.disabled = true;
+        });
+      };
+
+      const enableActions = () => {
+        actionButtons.forEach((btn) => {
+          btn.disabled = false;
+        });
+      };
+
+      const safeAsync = async (label, fn) => {
+        try {
+          await fn();
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          logEvent("Error", `${label} failed: ${message}`);
+        }
+      };
+
+      const handlers = {
+        expand: () => {
+          webApp?.expand();
+          updateViewportFlags();
+          logEvent("Action", "Requested full-height expansion.");
+        },
+        "toggle-main-button": () => {
+          if (!webApp?.MainButton) {
+            logEvent("Warning", "MainButton API is unavailable in this environment.");
+            return;
+          }
+          const button = webApp.MainButton;
+          if (mainButtonVisible) {
+            button.hide();
+            logEvent("MainButton", "Hid the main button.");
+          } else {
+            button.setText("Send sample payload");
+            if (typeof button.offClick === "function") {
+              button.offClick();
+            }
+            button.onClick(() => handlers["send-data"]?.());
+            button.show();
+            logEvent("MainButton", "Displayed the main button with sample text.");
+          }
+          mainButtonVisible = !mainButtonVisible;
+        },
+        "send-data": () => {
+          if (!webApp) return;
+          const payload = {
+            type: "mini-app-sample",
+            timestamp: new Date().toISOString(),
+            colorScheme: webApp.colorScheme,
+          };
+          webApp.sendData(JSON.stringify(payload));
+          logEvent("Data", `Sent payload to bot: ${JSON.stringify(payload)}`);
+        },
+        "haptic-impact": () => {
+          if (!webApp?.HapticFeedback) {
+            logEvent("Warning", "Haptic feedback is not supported.");
+            return;
+          }
+          webApp.HapticFeedback.impactOccurred("medium");
+          logEvent("Haptic", "Triggered medium impact haptic feedback.");
+        },
+        "haptic-notify": () => {
+          if (!webApp?.HapticFeedback) {
+            logEvent("Warning", "Haptic feedback is not supported.");
+            return;
+          }
+          webApp.HapticFeedback.notificationOccurred("success");
+          logEvent("Haptic", "Triggered success notification haptic feedback.");
+        },
+        "toggle-closing": () => {
+          if (!webApp) return;
+          closingConfirmationEnabled = !closingConfirmationEnabled;
+          if (closingConfirmationEnabled) {
+            webApp.enableClosingConfirmation();
+          } else {
+            webApp.disableClosingConfirmation();
+          }
+          logEvent("Action", `${closingConfirmationEnabled ? "Enabled" : "Disabled"} closing confirmation.`);
+        },
+        "show-alert": () => {
+          if (!webApp?.showAlert) {
+            logEvent("Warning", "Alerts are unavailable outside Telegram.");
+            return;
+          }
+          safeAsync("showAlert", () => webApp.showAlert("Hello from your Mini App!"));
+        },
+        "show-confirm": () => {
+          if (!webApp?.showConfirm) {
+            logEvent("Warning", "Confirm dialogs are unavailable outside Telegram.");
+            return;
+          }
+          safeAsync("showConfirm", async () => {
+            const confirmed = await webApp.showConfirm("Close this Mini App now?");
+            logEvent("Dialog", `User selected: ${confirmed ? "Yes" : "No"}`);
+            if (confirmed) {
+              webApp.close();
+            }
+          });
+        },
+        "open-docs": () => {
+          if (!webApp?.openTelegramLink) {
+            window.open("https://core.telegram.org/bots/webapps", "_blank", "noopener");
+            logEvent("Link", "Opened docs in a new browser tab.");
+            return;
+          }
+          webApp.openTelegramLink("https://core.telegram.org/bots/webapps");
+          logEvent("Link", "Opened Telegram Web App documentation inside Telegram.");
+        },
+        "request-fullscreen": () => {
+          if (!webApp?.requestFullscreen) {
+            logEvent("Warning", "Fullscreen API is unavailable.");
+            return;
+          }
+          safeAsync("requestFullscreen", async () => {
+            await webApp.requestFullscreen();
+            updateViewportFlags();
+            logEvent("Viewport", "Requested fullscreen mode.");
+          });
+        },
+        "exit-fullscreen": () => {
+          if (!webApp?.exitFullscreen) {
+            logEvent("Warning", "Fullscreen API is unavailable.");
+            return;
+          }
+          safeAsync("exitFullscreen", async () => {
+            await webApp.exitFullscreen();
+            updateViewportFlags();
+            logEvent("Viewport", "Requested exit from fullscreen.");
+          });
+        },
+        "hide-keyboard": () => {
+          if (!webApp?.hideKeyboard) {
+            logEvent("Warning", "hideKeyboard() is unavailable on this platform.");
+            return;
+          }
+          webApp.hideKeyboard();
+          logEvent("Input", "Requested keyboard hide.");
+        },
+        "check-home-screen": () => {
+          if (!webApp?.checkHomeScreenStatus) {
+            logEvent("Warning", "Home screen API is unavailable.");
+            return;
+          }
+          safeAsync("checkHomeScreenStatus", async () => {
+            const status = await webApp.checkHomeScreenStatus();
+            logEvent("Homescreen", `Status: ${JSON.stringify(status)}`);
+          });
+        },
+        "add-to-home-screen": () => {
+          if (!webApp?.addToHomeScreen) {
+            logEvent("Warning", "Home screen API is unavailable.");
+            return;
+          }
+          safeAsync("addToHomeScreen", async () => {
+            await webApp.addToHomeScreen();
+            logEvent("Homescreen", "Prompted user to add Mini App to home screen.");
+          });
+        },
+        "lock-orientation": () => {
+          if (!webApp?.lockOrientation) {
+            logEvent("Warning", "Orientation lock is unavailable.");
+            return;
+          }
+          safeAsync("lockOrientation", async () => {
+            await webApp.lockOrientation("portrait");
+            updateViewportFlags();
+            logEvent("Device", "Requested portrait orientation lock.");
+          });
+        },
+        "unlock-orientation": () => {
+          if (!webApp?.unlockOrientation) {
+            logEvent("Warning", "Orientation lock is unavailable.");
+            return;
+          }
+          safeAsync("unlockOrientation", async () => {
+            await webApp.unlockOrientation();
+            updateViewportFlags();
+            logEvent("Device", "Requested orientation unlock.");
+          });
+        },
+      };
+
+      disableActions();
+
+      if (!webApp) {
+        setStatus("Telegram Web App SDK not detected", "error");
+        fallbackNotice.classList.remove("hidden");
+        logEvent("Warning", "window.Telegram.WebApp is undefined. Actions disabled.");
+        return;
+      }
+
+      setStatus("Connected to Telegram Web App", "ready");
+      enableActions();
+
+      webApp.ready();
+      webApp.expand();
+
+      applyTheme();
+      populateSessionDetails();
+      updateViewportFlags();
+      updateSafeAreas();
+      refreshCapabilities();
+
+      logEvent("Lifecycle", "Telegram Web App is ready.");
+      logEvent("Lifecycle", `Color scheme: ${webApp.colorScheme || "unknown"}`);
+
+      const registerEvent = (eventName, handler) => {
+        if (!webApp?.onEvent) return;
+        try {
+          webApp.onEvent(eventName, handler);
+        } catch (error) {
+          logEvent("Warning", `Failed to register ${eventName} handler: ${error instanceof Error ? error.message : error}`);
+        }
+      };
+
+      registerEvent("themeChanged", () => {
+        applyTheme();
+        populateSessionDetails();
+        logEvent("Event", "Theme changed.");
+      });
+
+      registerEvent("viewportChanged", ({ isExpanded }) => {
+        expandedElement.textContent = isExpanded ? "Yes" : "No";
+        logEvent("Event", `Viewport changed. Expanded: ${isExpanded}`);
+      });
+
+      registerEvent("mainButtonClicked", () => {
+        logEvent("MainButton", "Main button clicked. Sample data dispatched.");
+        handlers["send-data"]();
+      });
+
+      registerEvent("backButtonClicked", () => {
+        logEvent("Event", "Back button clicked.");
+      });
+
+      registerEvent("settingsButtonClicked", () => {
+        logEvent("Event", "Settings button clicked.");
+      });
+
+      registerEvent("activated", () => {
+        updateViewportFlags();
+        logEvent("Lifecycle", "Mini App activated.");
+      });
+
+      registerEvent("deactivated", () => {
+        updateViewportFlags();
+        logEvent("Lifecycle", "Mini App deactivated.");
+      });
+
+      registerEvent("safeAreaChanged", (inset) => {
+        safeAreaElement.textContent = stringifyMaybe(inset);
+        logEvent("Viewport", "safeAreaInset changed.");
+      });
+
+      registerEvent("contentSafeAreaChanged", (inset) => {
+        contentSafeAreaElement.textContent = stringifyMaybe(inset);
+        logEvent("Viewport", "contentSafeAreaInset changed.");
+      });
+
+      registerEvent("fullscreenChanged", ({ isFullscreen }) => {
+        fullscreenElement.textContent = isFullscreen ? "Yes" : "No";
+        updateViewportFlags();
+        logEvent("Viewport", `Fullscreen changed: ${isFullscreen}`);
+      });
+
+      registerEvent("fullscreenFailed", (error) => {
+        logEvent("Viewport", `Fullscreen failed: ${JSON.stringify(error)}`);
+      });
+
+      registerEvent("homeScreenChecked", (status) => {
+        logEvent("Homescreen", `Checked status: ${JSON.stringify(status)}`);
+      });
+
+      registerEvent("homeScreenAdded", () => {
+        logEvent("Homescreen", "App added to home screen.");
+      });
+
+      registerEvent("emojiStatusAccessRequested", () => {
+        logEvent("Emoji", "Requested emoji status access.");
+      });
+
+      registerEvent("emojiStatusSet", () => {
+        logEvent("Emoji", "Emoji status set by user.");
+      });
+
+      registerEvent("emojiStatusFailed", (reason) => {
+        logEvent("Emoji", `Emoji status failed: ${JSON.stringify(reason)}`);
+      });
+
+      registerEvent("locationManagerUpdated", (payload) => {
+        logEvent("Location", `Location manager updated: ${JSON.stringify(payload)}`);
+      });
+
+      actionButtons.forEach((button) => {
+        const action = button.dataset.action;
+        button.addEventListener("click", () => {
+          const handler = handlers[action];
+          if (typeof handler === "function") {
+            handler();
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>
