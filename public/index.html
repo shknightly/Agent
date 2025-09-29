@@ -152,6 +152,70 @@
       color: var(--tg-text-color);
     }
 
+    .storage-grid {
+      display: grid;
+      gap: 1.25rem;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    .storage-panel {
+      background: rgba(148, 163, 184, 0.08);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 1rem;
+      padding: 1.1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .storage-panel h3 {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+
+    .storage-panel label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.85rem;
+      color: var(--tg-subtle-text-color);
+    }
+
+    .storage-panel input,
+    .storage-panel textarea {
+      font: inherit;
+      padding: 0.55rem 0.75rem;
+      border-radius: 0.75rem;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.8);
+      color: inherit;
+      resize: vertical;
+      min-height: 2.4rem;
+    }
+
+    .storage-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+
+    .storage-panel button {
+      flex: 1 1 45%;
+      min-width: 120px;
+    }
+
+    .storage-output {
+      min-height: 2.2rem;
+      font-size: 0.9rem;
+      color: var(--tg-subtle-text-color);
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px dashed rgba(148, 163, 184, 0.25);
+      border-radius: 0.75rem;
+      padding: 0.75rem;
+      white-space: pre-wrap;
+    }
+
     pre {
       margin: 0;
       padding: 1rem;
@@ -459,6 +523,54 @@
     </section>
 
     <section class="card">
+      <h2>Persistent storage playground</h2>
+      <p style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--tg-subtle-text-color);">
+        Experiment with the <strong>DeviceStorage</strong> and <strong>SecureStorage</strong> objects introduced in Bot API 9.0.
+        Values persist on the user's device, making it perfect for offline drafts, cached preferences, and encrypted secrets.
+      </p>
+      <div class="storage-grid">
+        <div class="storage-panel" data-storage="device">
+          <h3>DeviceStorage</h3>
+          <label>
+            Storage key
+            <input type="text" data-field="key" autocomplete="off" placeholder="e.g. sandbox.preferences" />
+          </label>
+          <label>
+            Value
+            <textarea data-field="value" rows="3" placeholder="JSON, tokens, or notes"></textarea>
+          </label>
+          <div class="storage-actions">
+            <button type="button" data-action="device-save" data-variant="success">Save value</button>
+            <button type="button" data-action="device-load">Load value</button>
+            <button type="button" data-action="device-delete" data-variant="danger">Delete key</button>
+          </div>
+          <div class="storage-output" data-field="output">Awaiting interaction…</div>
+        </div>
+        <div class="storage-panel" data-storage="secure">
+          <h3>SecureStorage</h3>
+          <label>
+            Storage key
+            <input type="text" data-field="key" autocomplete="off" placeholder="e.g. sandbox.secret" />
+          </label>
+          <label>
+            Value
+            <textarea data-field="value" rows="3" placeholder="Encrypted payload stored on device"></textarea>
+          </label>
+          <div class="storage-actions">
+            <button type="button" data-action="secure-save" data-variant="success">Save value</button>
+            <button type="button" data-action="secure-load">Load value</button>
+            <button type="button" data-action="secure-delete" data-variant="danger">Delete key</button>
+          </div>
+          <div class="storage-output" data-field="output">Awaiting interaction…</div>
+        </div>
+      </div>
+      <p style="margin-top: 1rem; font-size: 0.85rem; color: var(--tg-subtle-text-color);">
+        When storage APIs are unavailable (for example, outside the Telegram client), the console logs a warning and leaves your
+        values untouched.
+      </p>
+    </section>
+
+    <section class="card">
       <h2>Vercel Sandbox playbook</h2>
       <p style="margin-bottom: 0.9rem; color: var(--tg-subtle-text-color);">
         Launching AI-crafted interfaces inside Telegram pairs perfectly with Vercel Sandbox. Use it to:
@@ -502,6 +614,10 @@
       const eventLog = document.getElementById("event-log");
       const actionButtons = Array.from(document.querySelectorAll("[data-action]"));
       const capabilityNodes = Array.from(document.querySelectorAll(".capability"));
+      const storagePanels = {
+        device: document.querySelector('[data-storage="device"]'),
+        secure: document.querySelector('[data-storage="secure"]'),
+      };
 
       let webApp = window.Telegram && window.Telegram.WebApp;
       let mainButtonVisible = false;
@@ -530,6 +646,29 @@
       };
 
       const withFallback = (value, fallback) => (value === undefined || value === null || value === "" ? fallback : value);
+
+      const getStorageFields = (type) => {
+        const panel = storagePanels[type];
+        if (!panel) return {};
+        return {
+          keyInput: panel.querySelector('[data-field="key"]'),
+          valueInput: panel.querySelector('[data-field="value"]'),
+          output: panel.querySelector('[data-field="output"]'),
+        };
+      };
+
+      const updateStorageOutput = (type, text) => {
+        const { output } = getStorageFields(type);
+        if (output) {
+          output.textContent = text;
+        }
+      };
+
+      const normalizeKey = (value, fallback) => {
+        if (!value) return fallback;
+        const trimmed = value.trim();
+        return trimmed || fallback;
+      };
 
       const applyTheme = () => {
         if (!webApp) return;
@@ -793,6 +932,100 @@
             logEvent("Device", "Requested orientation unlock.");
           });
         },
+        "device-save": () => {
+          if (!webApp?.DeviceStorage?.setItem) {
+            logEvent("Warning", "DeviceStorage API is unavailable.");
+            updateStorageOutput("device", "DeviceStorage is unavailable in this environment.");
+            return;
+          }
+          const { keyInput, valueInput } = getStorageFields("device");
+          const key = normalizeKey(keyInput?.value, "sandbox.preferences");
+          const value = valueInput?.value ?? "";
+          safeAsync("DeviceStorage.setItem", async () => {
+            await webApp.DeviceStorage.setItem(key, value);
+            updateStorageOutput("device", `Saved ${value.length} characters to "${key}".`);
+            logEvent("DeviceStorage", `Stored value under "${key}".`);
+          });
+        },
+        "device-load": () => {
+          if (!webApp?.DeviceStorage?.getItem) {
+            logEvent("Warning", "DeviceStorage API is unavailable.");
+            updateStorageOutput("device", "DeviceStorage is unavailable in this environment.");
+            return;
+          }
+          const { keyInput } = getStorageFields("device");
+          const key = normalizeKey(keyInput?.value, "sandbox.preferences");
+          safeAsync("DeviceStorage.getItem", async () => {
+            const result = await webApp.DeviceStorage.getItem(key);
+            if (result === null || result === undefined) {
+              updateStorageOutput("device", `No value stored for "${key}".`);
+            } else {
+              updateStorageOutput("device", `Loaded value for "${key}":\n${result}`);
+            }
+            logEvent("DeviceStorage", `Read key "${key}".`);
+          });
+        },
+        "device-delete": () => {
+          if (!webApp?.DeviceStorage?.deleteItem) {
+            logEvent("Warning", "DeviceStorage API is unavailable.");
+            updateStorageOutput("device", "DeviceStorage is unavailable in this environment.");
+            return;
+          }
+          const { keyInput } = getStorageFields("device");
+          const key = normalizeKey(keyInput?.value, "sandbox.preferences");
+          safeAsync("DeviceStorage.deleteItem", async () => {
+            await webApp.DeviceStorage.deleteItem(key);
+            updateStorageOutput("device", `Deleted "${key}" from DeviceStorage.`);
+            logEvent("DeviceStorage", `Deleted key "${key}".`);
+          });
+        },
+        "secure-save": () => {
+          if (!webApp?.SecureStorage?.setItem) {
+            logEvent("Warning", "SecureStorage API is unavailable.");
+            updateStorageOutput("secure", "SecureStorage is unavailable in this environment.");
+            return;
+          }
+          const { keyInput, valueInput } = getStorageFields("secure");
+          const key = normalizeKey(keyInput?.value, "sandbox.secret");
+          const value = valueInput?.value ?? "";
+          safeAsync("SecureStorage.setItem", async () => {
+            await webApp.SecureStorage.setItem(key, value);
+            updateStorageOutput("secure", `Saved ${value.length} characters to "${key}".`);
+            logEvent("SecureStorage", `Stored value under "${key}".`);
+          });
+        },
+        "secure-load": () => {
+          if (!webApp?.SecureStorage?.getItem) {
+            logEvent("Warning", "SecureStorage API is unavailable.");
+            updateStorageOutput("secure", "SecureStorage is unavailable in this environment.");
+            return;
+          }
+          const { keyInput } = getStorageFields("secure");
+          const key = normalizeKey(keyInput?.value, "sandbox.secret");
+          safeAsync("SecureStorage.getItem", async () => {
+            const result = await webApp.SecureStorage.getItem(key);
+            if (result === null || result === undefined) {
+              updateStorageOutput("secure", `No value stored for "${key}".`);
+            } else {
+              updateStorageOutput("secure", `Loaded value for "${key}":\n${result}`);
+            }
+            logEvent("SecureStorage", `Read key "${key}".`);
+          });
+        },
+        "secure-delete": () => {
+          if (!webApp?.SecureStorage?.deleteItem) {
+            logEvent("Warning", "SecureStorage API is unavailable.");
+            updateStorageOutput("secure", "SecureStorage is unavailable in this environment.");
+            return;
+          }
+          const { keyInput } = getStorageFields("secure");
+          const key = normalizeKey(keyInput?.value, "sandbox.secret");
+          safeAsync("SecureStorage.deleteItem", async () => {
+            await webApp.SecureStorage.deleteItem(key);
+            updateStorageOutput("secure", `Deleted "${key}" from SecureStorage.`);
+            logEvent("SecureStorage", `Deleted key "${key}".`);
+          });
+        },
       };
 
       disableActions();
@@ -800,12 +1033,16 @@
       if (!webApp) {
         setStatus("Telegram Web App SDK not detected", "error");
         fallbackNotice.classList.remove("hidden");
+        updateStorageOutput("device", "Open inside Telegram to access DeviceStorage.");
+        updateStorageOutput("secure", "Open inside Telegram to access SecureStorage.");
         logEvent("Warning", "window.Telegram.WebApp is undefined. Actions disabled.");
         return;
       }
 
       setStatus("Connected to Telegram Web App", "ready");
       enableActions();
+      updateStorageOutput("device", "DeviceStorage ready. Keys persist per device.");
+      updateStorageOutput("secure", "SecureStorage ready. Values stay encrypted on device.");
 
       webApp.ready();
       webApp.expand();

@@ -281,11 +281,57 @@ def build_execution_reply(result: Dict[str, Any]) -> Tuple[str, bool]:
 
 
 class GeminiLLM:
+    """Thin async wrapper around the Gemini SDK with safe defaults."""
+
+    _configured_key: Optional[str] = None
+
     def __init__(self, api_key: str, model_name: str):
         import google.generativeai as genai
-        self.model = genai.GenerativeModel(model_name=model_name, api_key=api_key)
+
+        if not api_key:
+            raise ValueError("Gemini API key is required")
+
+        if GeminiLLM._configured_key != api_key:
+            genai.configure(api_key=api_key)
+            GeminiLLM._configured_key = api_key
+
+        self._generation_config = {
+            "temperature": 0.4,
+            "max_output_tokens": 2048,
+            "top_p": 0.9,
+        }
+        self.model = genai.GenerativeModel(model_name=model_name)
+
     async def generate(self, prompt: str) -> str:
-        response = await self.model.generate_content_async(prompt); return response.text
+        try:
+            response = await self.model.generate_content_async(
+                prompt,
+                generation_config=self._generation_config,
+                request_options={"timeout": 60},
+            )
+        except Exception as exc:  # pragma: no cover - network error surface
+            logger.error("Gemini request failed: %s", exc)
+            raise
+
+        text = getattr(response, "text", None)
+        if text:
+            return text.strip()
+
+        candidates = getattr(response, "candidates", None) or []
+        for candidate in candidates:
+            parts = getattr(candidate, "content", None)
+            if isinstance(parts, dict):
+                # Each part is typically stored under "parts" key
+                content_parts = parts.get("parts") or []
+            else:
+                content_parts = getattr(parts, "parts", [])
+            for part in content_parts or []:
+                value = part.get("text") if isinstance(part, dict) else getattr(part, "text", None)
+                if value:
+                    return value.strip()
+
+        logger.warning("Gemini returned an empty response.")
+        return "⚠️ Gemini did not return any content."
 
 class GroqLLM:
     def __init__(self, api_key: str, model: str):
@@ -298,14 +344,23 @@ class LLMManager:
         self.primary_llm = GeminiLLM(gemini_key, gemini_model) if gemini_key else None
         self.fallback_llm = GroqLLM(groq_key, groq_model) if groq_key else None
     async def generate(self, prompt: str) -> str:
-        if self.primary_llm:
+        for provider, label in (
+            (self.primary_llm, "Gemini"),
+            (self.fallback_llm, "Groq"),
+        ):
+            if not provider:
+                continue
             try:
-                return await self.primary_llm.generate(prompt)
-            except Exception as e: logger.warning(f"Primary LLM failed: {e}. Failing over.")
-        if self.fallback_llm:
-            try:
-                return await self.fallback_llm.generate(prompt)
-            except Exception as e2: logger.error(f"Fallback LLM failed: {e2}")
+                response = await provider.generate(prompt)
+            except Exception as exc:  # pragma: no cover - external API
+                logger.warning("%s provider failed: %s", label, exc)
+                continue
+
+            if isinstance(response, str) and response.strip():
+                return response.strip()
+
+            logger.debug("%s provider returned empty payload; trying fallback.", label)
+
         return "Both AI models are unavailable. Please try again later."
 
 
