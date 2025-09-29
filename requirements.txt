@@ -1,7 +1,7 @@
 aiogram
 groq
 python-dotenv
-aiosqlite
 google-generativeai
 aiohttp
 requests
+asyncpg
