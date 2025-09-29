@@ -23,10 +23,11 @@ from dotenv import load_dotenv
 from aiohttp import web
 import asyncpg
 from groq import AsyncGroq
+import google.generativeai as genai
 from aiogram import Bot, Dispatcher, Router, types, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Message, BotCommand, CallbackQuery, Update
+from aiogram.types import Message, BotCommand, CallbackQuery, Update, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.enums import ParseMode
 
@@ -37,6 +38,7 @@ load_dotenv()
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 DATABASE_URL = os.environ.get("DATABASE_URL")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "your-super-secret")
+VERCEL_URL = os.environ.get("VERCEL_URL")
 WEBHOOK_PATH = "/api/index.py"
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -49,6 +51,10 @@ MAX_CODE_SIZE = 15000
 # --- Logging ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s', stream=sys.stdout)
 logger = logging.getLogger("vercel-bot")
+
+# --- AI Client Configuration (Once per runtime) ---
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 def escape_markdown_v2(text: str) -> str:
     escape_chars = r'_*[]()~`>#+-=|{}.!'
@@ -65,13 +71,10 @@ class RateLimiter:
         async with self.lock:
             now = datetime.now()
             calls = self.user_calls.setdefault(user_id, deque())
-            while calls and calls[0] < now - timedelta(seconds=self.period):
-                calls.popleft()
+            while calls and calls[0] < now - timedelta(seconds=self.period): calls.popleft()
             if len(calls) >= self.max_calls:
-                if (s := self.period - (now - calls[0]).total_seconds()) > 0:
-                    await asyncio.sleep(s)
-                if calls:
-                    calls.popleft()
+                if (s := self.period - (now - calls[0]).total_seconds()) > 0: await asyncio.sleep(s)
+                if calls: calls.popleft()
             calls.append(now)
 
 class KnowledgeGraphManager:
@@ -144,32 +147,48 @@ class CodeExecutor:
         except Exception as e: return {"error": str(e)}
 
 class GeminiLLM:
-    def __init__(self, api_key: str, model_name: str):
-        import google.generativeai as genai
-        self.model = genai.GenerativeModel(model_name=model_name, api_key=api_key)
-    async def generate(self, prompt: str) -> str:
-        response = await self.model.generate_content_async(prompt); return response.text
+    def __init__(self, model_name: str):
+        self.model = genai.GenerativeModel(model_name)
+        self.generation_config = genai.types.GenerationConfig(candidate_count=1, temperature=0.7)
+    async def generate(self, prompt: str, timeout: int = 45) -> str:
+        try:
+            request_options = {"timeout": timeout}
+            response = await self.model.generate_content_async(prompt, generation_config=self.generation_config, request_options=request_options)
+            return response.text
+        except asyncio.TimeoutError:
+            logger.warning(f"Gemini request timed out after {timeout} seconds.")
+            raise
+        except Exception as e:
+            logger.error(f"An unexpected error occurred in GeminiLLM: {e}")
+            raise
 
 class GroqLLM:
     def __init__(self, api_key: str, model: str):
         self.client = AsyncGroq(api_key=api_key); self.model = model
     async def generate(self, prompt: str) -> str:
-        completion = await self.client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=self.model); return completion.choices[0].message.content
+        completion = await self.client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=self.model)
+        return completion.choices[0].message.content
 
 class LLMManager:
     def __init__(self, gemini_key: str, groq_key: str, gemini_model: str, groq_model: str):
-        self.primary_llm = GeminiLLM(gemini_key, gemini_model) if gemini_key else None
+        self.primary_llm = GeminiLLM(gemini_model) if gemini_key else None
         self.fallback_llm = GroqLLM(groq_key, groq_model) if groq_key else None
     async def generate(self, prompt: str) -> str:
         if self.primary_llm:
             try:
-                return await self.primary_llm.generate(prompt)
-            except Exception as e: logger.warning(f"Primary LLM failed: {e}. Failing over.")
+                text = await self.primary_llm.generate(prompt)
+                if text: return text
+                logger.warning("Primary LLM (Gemini) returned empty text. Failing over.")
+            except Exception as e:
+                logger.warning(f"Primary LLM (Gemini) failed: {e}. Failing over.")
         if self.fallback_llm:
             try:
-                return await self.fallback_llm.generate(prompt)
-            except Exception as e2: logger.error(f"Fallback LLM failed: {e2}")
-        return "Both AI models are unavailable. Please try again later."
+                text = await self.fallback_llm.generate(prompt)
+                if text: return text
+                logger.error("Fallback LLM (Groq) also returned empty text.")
+            except Exception as e2:
+                logger.error(f"Fallback LLM (Groq) failed: {e2}")
+        return "Both AI models are currently unavailable. Please try again later."
 
 # --- Module-level Singleton Initialization ---
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN_V2))
@@ -183,9 +202,22 @@ executor = CodeExecutor()
 security_validator = SecurityValidator()
 
 # --- Command Handlers ---
+@router.message(Command("ui"))
+async def cmd_ui(message: Message):
+    if not VERCEL_URL:
+        await message.answer("The web UI is not configured on the server.")
+        return
+
+    # Vercel will serve files from the /public directory at the root.
+    webapp_url = f"https://{VERCEL_URL}/index.html"
+
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Open Storage UI", web_app=WebAppInfo(url=webapp_url))
+    await message.answer("Click the button below to open the storage playground.", reply_markup=kb.as_markup())
+
 @router.message(CommandStart())
 async def cmd_start(message: Message):
-    text = "👋 *Welcome to your AI Coding Agent*\\!\n\nI can build things, execute code, and remember information for you."
+    text = "👋 *Welcome to your AI Coding Agent*\\!\n\nI can build things, execute code, and remember information for you. Try the new `/ui` command!"
     kb = InlineKeyboardBuilder().button(text="🚀 Try a Build Demo", callback_data="demo:build")
     await message.answer(text, reply_markup=kb.as_markup())
 
@@ -274,6 +306,8 @@ async def on_shutdown(app_instance: web.Application):
     if bot.session and not bot.session.closed: await bot.session.close()
     logger.info("Application resources closed.")
 
+# The Vercel python runtime expects the ASGI app to be exposed as 'app'.
+# It will handle running the server.
 app.router.add_post(WEBHOOK_PATH, webhook_handler)
 app.on_startup.append(on_startup)
 app.on_shutdown.append(on_shutdown)
